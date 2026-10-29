@@ -1,0 +1,40 @@
+{
+  "name": "luoshenfu",
+  "version": "1.0.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --config web/vite.config.ts",
+    "dev:server": "node --watch server/index.mjs --dev",
+    "build:web": "vite build --config web/vite.config.ts",
+    "typecheck": "tsc -p web/tsconfig.json --noEmit",
+    "test": "node scripts/prepare-app.mjs --runtime-only && src-tauri/binaries/node-aarch64-apple-darwin --test test/*.test.mjs",
+    "check": "npm run typecheck && npm run test && npm run build:web",
+    "app:prepare": "npm run build:web && node scripts/prepare-app.mjs",
+    "app:dev": "npm run app:prepare && tauri dev --target aarch64-apple-darwin",
+    "app:build": "npm run app:prepare && tauri build --target aarch64-apple-darwin --bundles app,dmg && node scripts/rename-dmg.mjs",
+    "app:build:signed": "npm run app:build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.4.0",
+    "@deepseek-ai/dsh": "0.1.5-rc.1",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-dialog": "2.7.3",
+    "@tauri-apps/plugin-notification": "^2.4.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.1",
+    "typescript": "5.9.3",
+    "vite": "7.2.2"
+  }
+}

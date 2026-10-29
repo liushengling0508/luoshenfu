@@ -1,0 +1,5 @@
+- id: acp
+  name: '@deepseek-ai/dsh-acp'
+  config:
+    provider: deepseek-official
+    model: deepseek-flash

@@ -1,0 +1,7 @@
+Copyright 2026 Luoshen Fu contributors
+
+洛神赋 includes portions adapted from Codex Taskboard
+(https://github.com/chuspeeism/dashi-taskboard), licensed under Apache-2.0.
+
+Deepseek Harness is bundled as an unmodified npm dependency and is licensed
+under the MIT License. Its license is copied into the application resources.

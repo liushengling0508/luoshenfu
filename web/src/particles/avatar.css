@@ -1,0 +1,475 @@
+/* 贾维斯粒子窗口：整个窗口背景透明，只有粒子本身发光。 */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.avatar-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 全息投影的本质是"光"，而光只有在暗底上才看得见。
+   浅色桌面上直接画发光粒子会被背景吃掉，所以给球体自己垫一层径向暗底：
+   中心近乎不透明，向外羽化到全透明，看起来仍像浮在桌面上，而不是一张硬边卡片。
+   它放在 canvas 之前，所以粒子画在这层之上。 */
+.avatar-halo {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  /* 多段渐变更柔和：两段式（0.86 → 0.5 → 0）会在视觉上留下一圈可辨的硬边。 */
+  background: radial-gradient(circle at 50% 47%,
+    rgba(5, 11, 24, 0.82) 0%,
+    rgba(5, 11, 24, 0.7) 32%,
+    rgba(5, 11, 24, 0.46) 54%,
+    rgba(5, 11, 24, 0.2) 74%,
+    rgba(5, 11, 24, 0.05) 90%,
+    rgba(5, 11, 24, 0) 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.avatar-shell.halo .avatar-halo {
+  opacity: 1;
+}
+
+.avatar-canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.avatar-canvas:active {
+  cursor: grabbing;
+}
+
+/* 平时完全隐藏，鼠标移进窗口才浮现的最小出口。 */
+.avatar-mini {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.avatar-shell:hover .avatar-mini {
+  opacity: 1;
+}
+
+.avatar-mini button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(8, 14, 28, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.avatar-mini button:hover,
+.avatar-mini button.active {
+  background: rgba(56, 120, 255, 0.45);
+  border-color: rgba(140, 190, 255, 0.6);
+}
+
+/* 出错时才短暂出现的一行小字。 */
+.avatar-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  max-width: 88%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(8, 14, 28, 0.8);
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  color: #ffd9d9;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+
+.avatar-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 62px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  color: rgba(198, 232, 255, 0.82);
+  text-shadow: 0 0 14px rgba(88, 178, 255, 0.65);
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.avatar-caption.quiet {
+  opacity: 0.42;
+}
+
+/* 问答输入：默认半隐，悬停或获得焦点时完全显示，不干扰观赏。 */
+.avatar-ask {
+  position: absolute;
+  left: 50%;
+  bottom: 46px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: min(86%, 320px);
+  opacity: 0.35;
+  transition: opacity 0.22s ease;
+}
+
+.avatar-shell:hover .avatar-ask,
+.avatar-ask:focus-within {
+  opacity: 1;
+}
+
+.avatar-ask input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(126, 190, 255, 0.2);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11px;
+  color: #eaf5ff;
+  background: rgba(7, 16, 28, 0.72);
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+
+.avatar-ask input::placeholder {
+  color: rgba(160, 200, 235, 0.45);
+}
+
+.avatar-ask input:focus {
+  border-color: rgba(126, 190, 255, 0.5);
+}
+
+.avatar-ask button {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  color: #eaf5ff;
+  background: rgba(126, 190, 255, 0.22);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.avatar-ask button:hover:not(:disabled) {
+  background: rgba(126, 190, 255, 0.4);
+}
+
+.avatar-ask button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+/* 回答气泡：浮在输入框上方；过高时内部滚动，不撑破小窗口。 */
+.avatar-answer {
+  position: absolute;
+  left: 50%;
+  bottom: 82px;
+  transform: translateX(-50%);
+  width: min(88%, 340px);
+  max-height: 34vh;
+  overflow: auto;
+  padding: 8px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 190, 255, 0.16);
+  background: rgba(7, 16, 28, 0.82);
+  backdrop-filter: blur(12px);
+  font-size: 11px;
+  line-height: 1.65;
+  color: rgba(226, 241, 255, 0.92);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.avatar-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 190, 255, 0.18);
+  background: rgba(7, 16, 28, 0.62);
+  backdrop-filter: blur(14px);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.avatar-shell:hover .avatar-bar {
+  opacity: 1;
+}
+
+.avatar-bar button {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  color: rgba(206, 230, 255, 0.72);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.avatar-bar button:hover {
+  background: rgba(126, 190, 255, 0.14);
+  color: #eaf5ff;
+}
+
+.avatar-bar button.active {
+  background: rgba(126, 190, 255, 0.22);
+  color: #ffffff;
+}
+
+.avatar-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: rgba(126, 190, 255, 0.2);
+}
+
+.avatar-settings {
+  position: absolute;
+  left: 50%;
+  bottom: 46px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 7px;
+  width: 236px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  border: 1px solid rgba(126, 190, 255, 0.18);
+  background: rgba(7, 16, 28, 0.82);
+  backdrop-filter: blur(16px);
+}
+
+.avatar-settings label {
+  display: grid;
+  grid-template-columns: 26px 1fr 46px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(198, 228, 255, 0.7);
+}
+
+.avatar-settings input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  margin: 0;
+  border-radius: 2px;
+  background: rgba(126, 190, 255, 0.22);
+  cursor: pointer;
+}
+
+.avatar-settings input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #8fc8ff;
+  box-shadow: 0 0 8px rgba(120, 190, 255, 0.7);
+}
+
+.avatar-settings select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(126, 190, 255, 0.2);
+  border-radius: 7px;
+  padding: 3px 5px;
+  font-size: 10px;
+  color: #eaf5ff;
+  background: rgba(7, 16, 28, 0.72);
+  outline: none;
+}
+
+.avatar-settings select:focus {
+  border-color: rgba(126, 190, 255, 0.5);
+}
+
+/* 试听按钮：占 label 的第三列，和右侧数值同宽。 */
+.avatar-try {
+  justify-self: end;
+  width: 30px;
+  height: 18px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 9px;
+  color: #eaf5ff;
+  background: rgba(126, 190, 255, 0.22);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.avatar-try:hover {
+  background: rgba(126, 190, 255, 0.4);
+}
+
+.avatar-settings b {
+  font-size: 9px;
+  font-weight: 500;
+  text-align: right;
+  color: rgba(160, 200, 235, 0.62);
+}
+
+.avatar-settings-reset {
+  border: 0;
+  border-radius: 8px;
+  margin-top: 1px;
+  padding: 5px;
+  font-size: 10px;
+  color: rgba(198, 228, 255, 0.66);
+  background: rgba(126, 190, 255, 0.12);
+  cursor: pointer;
+}
+
+.avatar-settings-reset:hover {
+  background: rgba(126, 190, 255, 0.22);
+  color: #eaf5ff;
+}
+
+.avatar-switch {
+  justify-self: start;
+  width: 34px;
+  height: 18px;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(126, 190, 255, 0.18);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.avatar-switch i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(198, 228, 255, 0.6);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.avatar-switch.on {
+  background: rgba(126, 190, 255, 0.45);
+}
+
+.avatar-switch.on i {
+  transform: translateX(16px);
+  background: #eaf5ff;
+}
+
+.avatar-status {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(160, 200, 235, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.avatar-shell:hover .avatar-status {
+  opacity: 1;
+}
+
+.avatar-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(255, 190, 190, 0.9);
+}
+
+/* 窗体最小会缩到 300px，控制条必须跟着收窄，否则会溢出窗体。 */
+@media (max-width: 380px) {
+  .avatar-bar {
+    gap: 2px;
+    padding: 3px 5px;
+  }
+
+  .avatar-bar button {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .avatar-settings {
+    width: 208px;
+    padding: 9px 10px;
+  }
+
+  .avatar-settings label {
+    grid-template-columns: 24px 1fr 42px;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 330px) {
+  .avatar-bar button {
+    padding: 3px 4px;
+    font-size: 9px;
+  }
+
+  .avatar-settings {
+    width: 186px;
+  }
+}
+
+/* 唤醒词输入框：和设置面板里的下拉、滑块保持同一套观感。 */
+.avatar-wake-input {
+  width: 104px;
+  padding: 3px 7px;
+  border: 1px solid rgba(126, 190, 255, 0.25);
+  border-radius: 7px;
+  background: rgba(8, 16, 30, 0.7);
+  color: #eaf5ff;
+  font-size: 11px;
+  text-align: center;
+}
+
+.avatar-wake-input:focus {
+  outline: none;
+  border-color: rgba(150, 205, 255, 0.6);
+}

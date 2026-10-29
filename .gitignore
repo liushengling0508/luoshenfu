@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.data-dev/
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/resources/
+*.log
+.DS_Store
+
+.idea/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

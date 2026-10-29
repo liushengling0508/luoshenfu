@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>洛神赋需要控制系统界面，以便智能体按你的指令完成电脑操作与验证。</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>贾维斯需要感知说话时的音量，让粒子随声音起伏。音频只在本机处理，不会上传。</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>贾维斯需要把你说的话转成文字，才能听懂提问。识别优先在本机完成，音频不会上传。</string>
+</dict>
+</plist>
